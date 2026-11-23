@@ -1,5 +1,5 @@
 // Tiny, original PDF fixtures exercise real PDF.js parsing without checked-in books.
-export function makePdf({ scanned = false } = {}) {
+export function makePdf({ scanned = false, labeled = false } = {}) {
   const pages = scanned ? [''] : [
     'THE BLACKTHORN GATE',
     'An introduction before printed page one.',
@@ -8,7 +8,7 @@ export function makePdf({ scanned = false } = {}) {
     'You found the ending. THE END.',
   ];
   const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
+    `<< /Type /Catalog /Pages 2 0 R ${labeled ? '/PageLabels << /Nums [0 << /P () >> 2 << /S /D /St 1 >>] >>' : ''} >>`,
     `<< /Type /Pages /Kids [${pages.map((_, index) => `${4 + index * 2} 0 R`).join(' ')}] /Count ${pages.length} >>`,
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
   ];

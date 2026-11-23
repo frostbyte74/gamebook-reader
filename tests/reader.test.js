@@ -1,6 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { findChoices, getPageText, navigate, pageCount, restart, retrace, textFromItems, validatePageSettings } from '../src/reader.js';
+import { detectFirstPage, findChoices, getPageText, navigate, pageCount, restart, retrace, textFromItems, validatePageSettings } from '../src/reader.js';
+
+test('embedded labels distinguish printed pages from PDF positions', () => {
+  const labels = [...Array(8).fill(''), ...Array.from({ length: 108 }, (_, index) => String(index + 1))];
+  assert.equal(detectFirstPage(labels), 9);
+  assert.equal(detectFirstPage(['i', 'ii', '1', '2', '3']), 3);
+  assert.equal(detectFirstPage(['', '01', '02']), 2);
+  assert.equal(detectFirstPage(['1']), 1);
+});
+
+test('missing or inconsistent labels do not invent a printed-page offset', () => {
+  for (const labels of [null, [], ['', ''], ['i', 'ii'], ['', '1', '3'], ['1', '2', '1'], ['', '1', 'appendix']]) {
+    assert.equal(detectFirstPage(labels), null);
+  }
+});
 
 test('printed page offsets are used for every lookup and the final page', () => {
   const book = { pages: ['cover', 'intro', 'start', 'middle', 'ending'], firstPage: 3 };

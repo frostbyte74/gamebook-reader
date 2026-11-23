@@ -16,13 +16,15 @@ Open the local address printed by Vite. Use `npm run build` to generate the stat
 ## Read a book
 
 1. Select **Open a PDF**. Each page opens in its **Original page** layout, preserving the book's text, illustrations, and page design.
-2. In **Reader settings**, identify the PDF page that contains printed page 1. For a cover, two introduction pages, then story page 1, enter `4`.
+2. The reader detects where printed page 1 starts when the PDF contains consistent embedded page labels. Review the detected position in **Reader settings**, or enter it manually when labels are missing. For a cover, two introduction pages, then story page 1, enter `4`. **Use detected numbering** restores the detected offset after a manual override.
 3. The first PDF page appears as a cover thumbnail at the top right and as a faded, full-screen background. Change **Use this PDF page as the cover** to update both. Adjust the background intensity separately; zero hides the background without hiding the thumbnail.
 4. Follow generated **Turn to page** buttons, use **Continue** to advance sequentially, or enter any printed page number in **Go to page**.
 5. **Restart book** returns to printed page 1 and clears the reading trail, without deleting the book or settings.
 6. Switch to **Text view** for reflowed text and adjustable reading size. Switch back to **Original page** to see all artwork. The selected view is saved; opening a new PDF starts in Original page view.
 
 The app recognizes common English references such as "turn to page 42", "go to 12", and "page 9". Detection is best-effort; unusual wording, OCR errors, or references to a range may require the manual page jump. One PDF page maps to one printed page. This is not a numbered-section parser.
+
+Choices and manual jumps use the book's printed numbers, not PDF positions. Both appear above the reading page (for example, "Printed page 1 / PDF page 9 of 116"). Detection uses PDF page-label metadata, not guessed numbers in OCR text. Books without consistent metadata still need the starting PDF position set manually; missing, reordered, or two-page scans are not handled by a fixed offset. Previously saved books still using the old default offset are checked once and restarted at printed page 1 if corrected; existing non-default manual offsets are preserved.
 
 ## Local saving and privacy
 

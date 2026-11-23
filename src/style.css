@@ -56,6 +56,7 @@ progress { width: 100%; height: 7px; accent-color: var(--green); margin-bottom: 
 .paper-top { display: flex; justify-content: space-between; gap: 15px; color: #7e7869; font-size: 9px; font-weight: 700; letter-spacing: 1.8px; border-bottom: 1px solid #e1dbcd; padding-bottom: 19px; }
 .ornament { text-align: center; color: #94805c; font-family: Georgia, serif; font-size: 18px; margin: 26px 0 12px; letter-spacing: 6px; }
 .paper h2 { font: 30px/1.2 Georgia, 'Times New Roman', serif; text-align: center; margin: 10px 0 28px; color: #37402e; }
+.page-position { color: var(--muted); font-size: 11px; text-align: center; margin: -16px 0 20px; }
 .page-display { display: flex; justify-content: center; gap: 8px; margin: 0 0 20px; }
 .page-display .button[aria-pressed="true"] { background: var(--green); color: #fffcef; border-color: var(--green); }
 .original-page { min-width: 0; min-height: 100px; }

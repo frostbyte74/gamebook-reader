@@ -191,3 +191,79 @@ test('rapid page turns and replacing books never leave a stale illustration', as
   await expectIllustration(page, 1, [68, 119, 68]);
   expect(errors).toEqual([]);
 });
+
+test('printed labels automatically map choices, while manual overrides and detected numbering survive reloads', async ({ page }) => {
+  await page.locator('#pdf-input').setInputFiles({ name: 'Labeled.pdf', mimeType: 'application/pdf', buffer: makePdf({ labeled: true }) });
+  await page.getByRole('dialog', { name: 'Make yourself comfortable' }).waitFor();
+  await expect(page.getByLabel('Printed page 1 starts at PDF page')).toHaveValue('3');
+  await expect(page.locator('#detected-numbering')).toContainText('printed page 1 at PDF page 3');
+  await page.getByRole('button', { name: 'Close settings' }).click();
+  await expect(page.locator('#pdf-page-position')).toHaveText('Printed page 1 / PDF page 3 of 5');
+  await expectIllustration(page, 3, [221, 34, 34]);
+  await page.getByRole('button', { name: 'Turn to page 3' }).click();
+  await expectIllustration(page, 5, [34, 68, 221]);
+  await expect(page.locator('#pdf-page-position')).toHaveText('Printed page 3 / PDF page 5 of 5');
+  await page.getByRole('button', { name: 'Reader settings' }).click();
+  await page.getByLabel('Printed page 1 starts at PDF page').fill('1');
+  await page.getByRole('button', { name: 'Save settings' }).click();
+  await expectIllustration(page, 1, [68, 119, 68]);
+  await page.reload();
+  await expectIllustration(page, 1, [68, 119, 68]);
+  await page.getByRole('button', { name: 'Reader settings' }).click();
+  await expect(page.getByLabel('Printed page 1 starts at PDF page')).toHaveValue('1');
+  await page.getByRole('button', { name: 'Use detected numbering' }).click();
+  await page.getByRole('button', { name: 'Save settings' }).click();
+  await expectIllustration(page, 3, [221, 34, 34]);
+  await page.reload();
+  await expect(page.locator('#pdf-page-position')).toHaveText('Printed page 1 / PDF page 3 of 5');
+  await expectIllustration(page, 3, [221, 34, 34]);
+});
+
+test('old saved books correct the default offset without overwriting existing manual offsets', async ({ page }) => {
+  await page.locator('#pdf-input').setInputFiles({ name: 'Saved.pdf', mimeType: 'application/pdf', buffer: makePdf({ labeled: true }) });
+  await page.getByRole('dialog', { name: 'Make yourself comfortable' }).waitFor();
+  await page.getByRole('button', { name: 'Close settings' }).click();
+  await expectIllustration(page, 3, [221, 34, 34]);
+
+  async function simulateOldSavedBook(firstPage) {
+    await page.evaluate(firstPage => new Promise((resolve, reject) => {
+      const request = indexedDB.open('turning-pages', 1);
+      request.onsuccess = () => {
+        const db = request.result;
+        const transaction = db.transaction('reader', 'readwrite');
+        const store = transaction.objectStore('reader');
+        const bookRequest = store.get('book');
+        bookRequest.onsuccess = () => {
+          const book = bookRequest.result;
+          book.firstPage = firstPage;
+          delete book.firstPageSource;
+          delete book.detectedFirstPage;
+          store.put(book, 'book');
+        };
+        const currentRequest = store.get('current');
+        currentRequest.onsuccess = () => {
+          const current = currentRequest.result;
+          current.state = { page: 2, history: [1] };
+          store.put(current, 'current');
+        };
+        transaction.oncomplete = () => { db.close(); resolve(); };
+        transaction.onerror = () => reject(transaction.error);
+      };
+      request.onerror = () => reject(request.error);
+    }), firstPage);
+  }
+
+  await simulateOldSavedBook(1);
+  await page.reload();
+  await expect(page.getByRole('status')).toContainText('Corrected printed page numbering');
+  await expect(page.locator('#pdf-page-position')).toHaveText('Printed page 1 / PDF page 3 of 5');
+  await expectIllustration(page, 3, [221, 34, 34]);
+  await expect(page.getByRole('button', { name: 'Retrace a step' })).toBeDisabled();
+  await simulateOldSavedBook(4);
+  await page.reload();
+  await expect(page.locator('#pdf-page-position')).toHaveText('Printed page 2 / PDF page 5 of 5');
+  await expectIllustration(page, 5, [34, 68, 221]);
+  await page.getByRole('button', { name: 'Reader settings' }).click();
+  await expect(page.getByLabel('Printed page 1 starts at PDF page')).toHaveValue('4');
+  await expect(page.locator('#detected-numbering')).toContainText('printed page 1 at PDF page 3');
+});

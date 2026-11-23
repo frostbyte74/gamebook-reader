@@ -2,6 +2,19 @@ export function pageCount(book) {
   return book.pages.length - book.firstPage + 1;
 }
 
+export function detectFirstPage(labels) {
+  if (!Array.isArray(labels)) return null;
+  const start = labels.findIndex(label => /^0*1$/.test(label ?? ''));
+  if (start < 0) return null;
+  let matches = 0;
+  for (let index = start; index < labels.length; index += 1) {
+    if (!/^\d+$/.test(labels[index] ?? '')) continue;
+    if (Number(labels[index]) !== index - start + 1) return null;
+    matches += 1;
+  }
+  return matches >= Math.min(2, labels.length - start) ? start + 1 : null;
+}
+
 export function getPageText(book, page) {
   if (!Number.isInteger(page) || page < 1 || page > pageCount(book)) {
     throw new RangeError('That page is not in this book.');

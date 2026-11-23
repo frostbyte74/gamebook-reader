@@ -11,6 +11,7 @@ const defaultPreferences = { opacity: 18, textSize: 21, view: 'original' };
 let preferences = { ...defaultPreferences };
 let busy = false;
 let settingsBusy = false;
+let settingsNumberingSource;
 let saveQueue = Promise.resolve();
 let savedBook;
 const pageView = createPageView($('#original-page-view'), $('#page-canvas'), $('#page-render-status'));
@@ -50,6 +51,8 @@ function render(focus = false) {
   $('#page-counter').textContent = `PAGE ${state.page} OF ${count}`;
   $('#chapter-label').textContent = state.page === 1 ? 'THE ADVENTURE BEGINS' : 'YOUR ADVENTURE CONTINUES';
   $('#page-heading').textContent = `Page ${state.page}`;
+  $('#pdf-page-position').hidden = book.isDemo;
+  $('#pdf-page-position').textContent = `Printed page ${state.page} / PDF page ${book.firstPage + state.page - 1} of ${book.pages.length}`;
   const paragraphs = text.trim() ? text.split(/\n\s*\n/) : ['There is no selectable text on this PDF page. Switch to Original page to see its images and layout. You can still Continue or Go to page; automatic choices and Text view require selectable text or OCR.'];
   $('#page-text').replaceChildren(...paragraphs.map(paragraph => {
     const element = document.createElement('p');
@@ -179,7 +182,9 @@ $('#pdf-input').addEventListener('change', async event => {
     state = restart(state);
     preferences = { ...preferences, view: 'original' };
     render(true);
-    message('Book opened. Use Reader settings to tell us which PDF page is printed page 1.');
+    message(book.detectedFirstPage
+      ? `Book opened. Printed page 1 was detected at PDF page ${book.detectedFirstPage}. Choices and jumps use printed page numbers.`
+      : 'Book opened. No reliable printed-page labels were found; set the PDF position of printed page 1 in Reader settings.');
     persist();
     openSettings();
   } catch (error) {
@@ -193,7 +198,12 @@ $('#pdf-input').addEventListener('change', async event => {
 });
 
 function openSettings() {
+  settingsNumberingSource = book.firstPageSource ?? 'manual';
   $('#first-page').value = book.firstPage;
+  $('#detected-numbering').textContent = book.isDemo ? '' : book.detectedFirstPage
+    ? `PDF page labels identify printed page 1 at PDF page ${book.detectedFirstPage}.`
+    : 'No reliable embedded page labels were found. Match the first printed page manually.';
+  $('#use-detected-numbering').hidden = !book.detectedFirstPage;
   $('#cover-page').value = book.coverPage;
   $('#first-page').max = book.pages.length;
   $('#cover-page').max = book.pages.length;
@@ -206,6 +216,13 @@ function openSettings() {
 }
 
 $('#open-settings').addEventListener('click', openSettings);
+$('#first-page').addEventListener('input', () => {
+  settingsNumberingSource = 'manual';
+});
+$('#use-detected-numbering').addEventListener('click', () => {
+  $('#first-page').value = book.detectedFirstPage;
+  settingsNumberingSource = 'auto';
+});
 $('#close-settings').addEventListener('click', () => $('#settings-dialog').close());
 $('#settings-dialog').addEventListener('cancel', event => {
   if (settingsBusy) event.preventDefault();
@@ -231,10 +248,10 @@ $('#settings-form').addEventListener('submit', async event => {
       cover = await renderCover(pdf, coverPage);
     }
     if (firstPage !== book.firstPage) state = restart(state);
-    book = { ...book, firstPage, coverPage, cover };
+    book = { ...book, firstPage, firstPageSource: settingsNumberingSource, coverPage, cover };
     preferences = { ...preferences, opacity: Number($('#cover-opacity').value), textSize: Number($('#text-size').value) };
     $('#settings-dialog').close();
-    message('Reader settings saved.');
+    message(`Reader settings saved. Printed page 1 corresponds to PDF page ${firstPage}.`);
     render(true);
     persist();
   } catch (error) {
@@ -255,10 +272,27 @@ try {
     book = saved.book;
     state = saved.state;
     preferences = { ...defaultPreferences, ...saved.preferences };
+    let numberingChanged = false;
+    if (!book.isDemo && !book.firstPageSource) {
+      let detectedFirstPage = null;
+      try {
+        const { detectPdfFirstPage } = await import('./pdf.js');
+        detectedFirstPage = await detectPdfFirstPage(book.bytes);
+      } catch {
+        // Keep the existing mapping if this saved PDF cannot be inspected.
+      }
+      const firstPage = book.firstPage === 1 ? detectedFirstPage ?? 1 : book.firstPage;
+      numberingChanged = firstPage !== book.firstPage;
+      book = { ...book, firstPage, detectedFirstPage, firstPageSource: book.firstPage === 1 ? 'auto' : 'manual' };
+      if (numberingChanged) state = restart(state);
+    }
     getPageText(book, state.page);
-    savedBook = book;
+    savedBook = saved.book;
     render();
-    message('Your adventure is right where you left it.');
+    message(numberingChanged
+      ? `Corrected printed page numbering: page 1 is PDF page ${book.firstPage}. Your adventure has restarted at printed page 1.`
+      : 'Your adventure is right where you left it.');
+    if (book !== saved.book) persist();
   }
 } catch {
   book = createDemo();

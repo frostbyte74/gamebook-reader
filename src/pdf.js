@@ -1,6 +1,6 @@
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { textFromItems } from './reader.js';
+import { detectFirstPage, textFromItems } from './reader.js';
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -40,10 +40,20 @@ export async function renderCover(document, pageNumber) {
   return image;
 }
 
+export async function detectPdfFirstPage(bytes) {
+  const document = await openPdf(bytes);
+  try {
+    return detectFirstPage(await document.getPageLabels());
+  } finally {
+    await document.loadingTask.destroy();
+  }
+}
+
 export async function importPdf(file, onProgress) {
   const bytes = await file.arrayBuffer();
   const document = await openPdf(bytes);
   try {
+    const detectedFirstPage = detectFirstPage(await document.getPageLabels().catch(() => null));
     const pages = [];
     for (let number = 1; number <= document.numPages; number += 1) {
       const page = await document.getPage(number);
@@ -58,7 +68,9 @@ export async function importPdf(file, onProgress) {
       title: file.name.replace(/\.pdf$/i, ''),
       pages,
       bytes,
-      firstPage: 1,
+      firstPage: detectedFirstPage ?? 1,
+      detectedFirstPage,
+      firstPageSource: 'auto',
       coverPage: 1,
       cover,
       isDemo: false,
