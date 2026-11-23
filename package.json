@@ -1,0 +1,24 @@
+{
+  "name": "gamebook-reader",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare:pdfjs": "node scripts/prepare-pdfjs.js",
+    "predev": "npm run prepare:pdfjs",
+    "dev": "vite --host 127.0.0.1",
+    "prebuild": "npm run prepare:pdfjs",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test tests/reader.test.js",
+    "test:browser": "playwright test",
+    "check": "npm test && npm run build && npm run test:browser"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^6.5.438"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "vite": "^7.3.8"
+  }
+}

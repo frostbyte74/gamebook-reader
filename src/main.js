@@ -1,0 +1,235 @@
+import './style.css';
+import { createDemo } from './demo.js';
+import { findChoices, getPageText, navigate, pageCount, restart, retrace, validatePageSettings } from './reader.js';
+import { readSaved, saveBook } from './storage.js';
+
+const $ = selector => document.querySelector(selector);
+let book = createDemo();
+let state = { page: 1, history: [] };
+let preferences = { opacity: 18, textSize: 21 };
+let busy = false;
+let settingsBusy = false;
+let saveQueue = Promise.resolve();
+let savedBook;
+
+function message(text, error = false) {
+  $('#status').textContent = text;
+  $('#status').classList.toggle('error', error);
+}
+
+function persist() {
+  // Serialize writes so quick page turns cannot overwrite newer progress.
+  const snapshot = { book, state, preferences };
+  saveQueue = saveQueue.catch(() => {}).then(async () => {
+    await saveBook(snapshot, savedBook !== snapshot.book);
+    savedBook = snapshot.book;
+  }).catch(() => {
+    message('Your browser could not save this book. You can keep reading, but it may not be here after reloading.', true);
+  });
+}
+
+function setBusy(value) {
+  busy = value;
+  $('.paper').setAttribute('aria-busy', String(value));
+  $('#pdf-input').disabled = value;
+  $('#load-demo').disabled = value;
+  $('#open-settings').disabled = value;
+  $('#restart-book').disabled = value;
+  $('.file-button').classList.toggle('disabled', value);
+  $('#import-progress').hidden = !value;
+}
+
+function render(focus = false) {
+  const count = pageCount(book);
+  const text = getPageText(book, state.page);
+  $('#book-title').textContent = book.title;
+  $('#book-details').textContent = book.isDemo ? 'An original short adventure' : `${book.pages.length} PDF pages / ${count} book pages / saved on this device`;
+  $('#page-counter').textContent = `PAGE ${state.page} OF ${count}`;
+  $('#chapter-label').textContent = state.page === 1 ? 'THE ADVENTURE BEGINS' : 'YOUR ADVENTURE CONTINUES';
+  $('#page-heading').textContent = `Page ${state.page}`;
+  const paragraphs = text.trim() ? text.split(/\n\s*\n/) : ['There is no extractable text on this PDF page. It may be an illustration or a scanned page. Continue, jump to a page, or adjust where printed page 1 starts in Reader settings.'];
+  $('#page-text').replaceChildren(...paragraphs.map(paragraph => {
+    const element = document.createElement('p');
+    element.textContent = paragraph.replace(/\n/g, ' ');
+    return element;
+  }));
+  const choices = findChoices(text, count);
+  $('#choices').replaceChildren(...choices.map((target, index) => {
+    const button = document.createElement('button');
+    button.className = 'choice';
+    button.type = 'button';
+    const number = document.createElement('span');
+    number.className = 'choice-number';
+    number.textContent = String(index + 1).padStart(2, '0');
+    const label = document.createElement('span');
+    label.textContent = `Turn to page ${target}`;
+    const arrow = document.createElement('span');
+    arrow.setAttribute('aria-hidden', 'true');
+    arrow.textContent = '\u2192';
+    button.append(number, label, arrow);
+    button.addEventListener('click', () => goTo(target));
+    return button;
+  }));
+  $('.choices-section .eyebrow').textContent = choices.length ? 'WHAT WILL YOU DO?' : state.page === count ? 'THE END OF THIS PATH' : 'THE NEXT PAGE AWAITS';
+  $('#next-page').hidden = state.page === count;
+  $('#next-page').textContent = `Continue to page ${state.page + 1} \u2192`;
+  $('#back-page').disabled = !state.history.length;
+  $('#jump-page').max = count;
+  $('#jump-page').value = '';
+  $('#journey-note').textContent = state.history.length ? `${state.history.length} page turn${state.history.length === 1 ? '' : 's'} along your path.` : 'One page. A world of possibilities.';
+  $('#cover-background').style.backgroundImage = book.cover ? `url("${book.cover}")` : '';
+  document.documentElement.style.setProperty('--cover-opacity', preferences.opacity / 100);
+  document.documentElement.style.setProperty('--story-size', `${preferences.textSize}px`);
+  if (focus) {
+    $('#page-heading').focus({ preventScroll: true });
+    $('.paper').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+  }
+}
+
+function goTo(target) {
+  if (busy) return;
+  try {
+    state = navigate(state, target, pageCount(book));
+    message('');
+    render(true);
+    persist();
+  } catch (error) {
+    message(error.message, true);
+  }
+}
+
+$('#jump-form').addEventListener('submit', event => {
+  event.preventDefault();
+  goTo(Number($('#jump-page').value));
+});
+$('#next-page').addEventListener('click', () => goTo(state.page + 1));
+$('#back-page').addEventListener('click', () => {
+  if (busy) return;
+  state = retrace(state);
+  message('');
+  render(true);
+  persist();
+});
+$('#restart-book').addEventListener('click', () => $('#restart-dialog').showModal());
+$('#cancel-restart').addEventListener('click', () => $('#restart-dialog').close());
+$('#confirm-restart').addEventListener('click', () => {
+  state = restart(state);
+  $('#restart-dialog').close();
+  message('A fresh adventure begins.');
+  render(true);
+  persist();
+});
+$('#load-demo').addEventListener('click', () => {
+  book = createDemo();
+  state = restart(state);
+  message('An original adventure, ready to explore.');
+  render(true);
+  persist();
+});
+
+$('#pdf-input').addEventListener('change', async event => {
+  const file = event.target.files[0];
+  if (!file || busy) return;
+  setBusy(true);
+  message('Opening your book. The PDF stays on your device...');
+  $('#import-progress').removeAttribute('value');
+  try {
+    const { importPdf } = await import('./pdf.js');
+    const imported = await importPdf(file, (current, total) => {
+      $('#import-progress').max = total;
+      $('#import-progress').value = current;
+      message(`Extracting page ${current} of ${total}...`);
+    });
+    book = imported;
+    state = restart(state);
+    render(true);
+    message('Book opened. Use Reader settings to tell us which PDF page is printed page 1.');
+    persist();
+    openSettings();
+  } catch (error) {
+    message(error.name === 'PasswordException'
+      ? 'This PDF is password-protected. Open an unlocked copy to read it here.'
+      : `Could not open this book. ${error.message || 'Choose a valid PDF and try again.'}`, true);
+  } finally {
+    setBusy(false);
+    event.target.value = '';
+  }
+});
+
+function openSettings() {
+  $('#first-page').value = book.firstPage;
+  $('#cover-page').value = book.coverPage;
+  $('#first-page').max = book.pages.length;
+  $('#cover-page').max = book.pages.length;
+  $('#cover-page').disabled = book.isDemo;
+  $('#cover-opacity').value = preferences.opacity;
+  $('#opacity-value').value = `${preferences.opacity}%`;
+  $('#text-size').value = preferences.textSize;
+  $('#settings-error').textContent = '';
+  $('#settings-dialog').showModal();
+}
+
+$('#open-settings').addEventListener('click', openSettings);
+$('#close-settings').addEventListener('click', () => $('#settings-dialog').close());
+$('#settings-dialog').addEventListener('cancel', event => {
+  if (settingsBusy) event.preventDefault();
+});
+$('#cover-opacity').addEventListener('input', event => {
+  $('#opacity-value').value = `${event.target.value}%`;
+});
+$('#settings-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const firstPage = Number($('#first-page').value);
+  const coverPage = Number($('#cover-page').value);
+  const submit = $('#settings-form button[type="submit"]');
+  let pdf;
+  settingsBusy = true;
+  submit.disabled = true;
+  $('#close-settings').disabled = true;
+  try {
+    validatePageSettings(firstPage, coverPage, book.pages.length);
+    let cover = book.cover;
+    if (!book.isDemo && coverPage !== book.coverPage) {
+      const { openPdf, renderCover } = await import('./pdf.js');
+      pdf = await openPdf(book.bytes);
+      cover = await renderCover(pdf, coverPage);
+    }
+    if (firstPage !== book.firstPage) state = restart(state);
+    book = { ...book, firstPage, coverPage, cover };
+    preferences = { opacity: Number($('#cover-opacity').value), textSize: Number($('#text-size').value) };
+    $('#settings-dialog').close();
+    message('Reader settings saved.');
+    render(true);
+    persist();
+  } catch (error) {
+    $('#settings-error').textContent = error.message;
+  } finally {
+    if (pdf) await pdf.loadingTask.destroy();
+    submit.disabled = false;
+    $('#close-settings').disabled = false;
+    settingsBusy = false;
+  }
+});
+
+setBusy(true);
+render();
+try {
+  const saved = await readSaved();
+  if (saved?.book?.pages?.length) {
+    book = saved.book;
+    state = saved.state;
+    preferences = saved.preferences;
+    getPageText(book, state.page);
+    savedBook = book;
+    render();
+    message('Your adventure is right where you left it.');
+  }
+} catch {
+  book = createDemo();
+  state = { page: 1, history: [] };
+  preferences = { opacity: 18, textSize: 21 };
+  render();
+  message('Local saving is unavailable. You can still open a PDF and read during this visit.');
+} finally {
+  setBusy(false);
+}
