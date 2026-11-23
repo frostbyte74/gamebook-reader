@@ -54,6 +54,13 @@ progress { width: 100%; height: 7px; accent-color: var(--green); margin-bottom: 
 .paper-top { display: flex; justify-content: space-between; gap: 15px; color: #7e7869; font-size: 9px; font-weight: 700; letter-spacing: 1.8px; border-bottom: 1px solid #e1dbcd; padding-bottom: 19px; }
 .ornament { text-align: center; color: #94805c; font-family: Georgia, serif; font-size: 18px; margin: 26px 0 12px; letter-spacing: 6px; }
 .paper h2 { font: 30px/1.2 Georgia, 'Times New Roman', serif; text-align: center; margin: 10px 0 28px; color: #37402e; }
+.page-display { display: flex; justify-content: center; gap: 8px; margin: 0 0 20px; }
+.page-display .button[aria-pressed="true"] { background: var(--green); color: #fffcef; border-color: var(--green); }
+.original-page { min-width: 0; min-height: 100px; }
+.original-page canvas { display: block; width: 100%; height: auto; background: #fff; box-shadow: 0 1px 5px #292a2120; }
+.render-status { color: var(--muted); font-size: 12px; line-height: 1.7; }
+.render-status:empty { display: none; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .story { font: var(--story-size)/1.85 Georgia, 'Times New Roman', serif; color: #3d3d33; overflow-wrap: anywhere; }
 .story p { margin: 0 0 1.2em; }
 .story p:first-child::first-letter { font-size: 1.5em; color: #43563e; }

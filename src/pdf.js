@@ -52,9 +52,6 @@ export async function importPdf(file, onProgress) {
       page.cleanup();
       onProgress(number, document.numPages);
     }
-    if (!pages.some(text => text.trim())) {
-      throw new Error('This PDF has no selectable text. For a scanned book, run OCR on the PDF first, then open the searchable copy.');
-    }
     const cover = await renderCover(document, 1);
     return {
       id: crypto.randomUUID(),

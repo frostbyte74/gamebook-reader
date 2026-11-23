@@ -36,7 +36,16 @@
           <div class="paper-top"><span id="chapter-label">THE ADVENTURE BEGINS</span><span id="page-counter">PAGE 1 OF 6</span></div>
           <div class="ornament" aria-hidden="true">~ &diams; ~</div>
           <h2 id="page-heading" tabindex="-1">Page 1</h2>
+          <div id="page-display" class="page-display" role="group" aria-label="Page display" hidden>
+            <button id="view-original" class="button" type="button" aria-pressed="true">Original page</button>
+            <button id="view-text" class="button" type="button" aria-pressed="false">Text view</button>
+          </div>
+          <div id="original-page-view" class="original-page" aria-label="Original PDF page" aria-busy="false" hidden>
+            <p id="page-render-status" class="render-status" aria-live="polite"></p>
+            <canvas id="page-canvas" role="img" aria-label="Original page with text and illustrations" hidden></canvas>
+          </div>
           <div id="page-text" class="story"></div>
+          <p id="image-only-note" class="render-status" hidden>This page has no selectable text. Its artwork is preserved; use Continue or Go to page to navigate. OCR is needed only for automatic choices and Text view.</p>
           <section class="choices-section" aria-label="Choose your path">
             <p class="eyebrow">WHAT WILL YOU DO?</p>
             <div id="choices" class="choices"></div>
@@ -66,7 +75,7 @@
         <input id="cover-page" type="number" min="1" step="1" required>
         <label for="cover-opacity">Cover background intensity <output id="opacity-value">18%</output></label>
         <input id="cover-opacity" type="range" min="0" max="40" step="1" value="18">
-        <label for="text-size">Reading text size</label>
+        <label for="text-size">Text view reading size</label>
         <select id="text-size"><option value="18">Standard</option><option value="21">Comfortable</option><option value="24">Large</option></select>
         <p id="settings-error" class="error" role="alert"></p>
         <button class="button primary" type="submit">Save settings</button>

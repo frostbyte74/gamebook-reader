@@ -2,15 +2,18 @@ import './style.css';
 import { createDemo } from './demo.js';
 import { findChoices, getPageText, navigate, pageCount, restart, retrace, validatePageSettings } from './reader.js';
 import { readSaved, saveBook } from './storage.js';
+import { createPageView } from './page-view.js';
 
 const $ = selector => document.querySelector(selector);
 let book = createDemo();
 let state = { page: 1, history: [] };
-let preferences = { opacity: 18, textSize: 21 };
+const defaultPreferences = { opacity: 18, textSize: 21, view: 'original' };
+let preferences = { ...defaultPreferences };
 let busy = false;
 let settingsBusy = false;
 let saveQueue = Promise.resolve();
 let savedBook;
+const pageView = createPageView($('#original-page-view'), $('#page-canvas'), $('#page-render-status'));
 
 function message(text, error = false) {
   $('#status').textContent = text;
@@ -47,12 +50,25 @@ function render(focus = false) {
   $('#page-counter').textContent = `PAGE ${state.page} OF ${count}`;
   $('#chapter-label').textContent = state.page === 1 ? 'THE ADVENTURE BEGINS' : 'YOUR ADVENTURE CONTINUES';
   $('#page-heading').textContent = `Page ${state.page}`;
-  const paragraphs = text.trim() ? text.split(/\n\s*\n/) : ['There is no extractable text on this PDF page. It may be an illustration or a scanned page. Continue, jump to a page, or adjust where printed page 1 starts in Reader settings.'];
+  const paragraphs = text.trim() ? text.split(/\n\s*\n/) : ['There is no selectable text on this PDF page. Switch to Original page to see its images and layout. You can still Continue or Go to page; automatic choices and Text view require selectable text or OCR.'];
   $('#page-text').replaceChildren(...paragraphs.map(paragraph => {
     const element = document.createElement('p');
     element.textContent = paragraph.replace(/\n/g, ' ');
     return element;
   }));
+  const originalView = !book.isDemo && preferences.view !== 'text';
+  $('#page-display').hidden = book.isDemo;
+  $('#view-original').setAttribute('aria-pressed', String(originalView));
+  $('#view-text').setAttribute('aria-pressed', String(!originalView));
+  $('#original-page-view').hidden = !originalView;
+  $('#page-text').classList.toggle('visually-hidden', originalView);
+  $('#image-only-note').hidden = !originalView || Boolean(text.trim());
+  $('#page-canvas').setAttribute('aria-label', `Page ${state.page} in original PDF layout, including illustrations`);
+  if (originalView) {
+    pageView.show(book, book.firstPage + state.page - 1);
+  } else {
+    pageView.hide(book.isDemo);
+  }
   const choices = findChoices(text, count);
   $('#choices').replaceChildren(...choices.map((target, index) => {
     const button = document.createElement('button');
@@ -98,6 +114,16 @@ function goTo(target) {
   }
 }
 
+function changeView(view) {
+  if (busy) return;
+  preferences = { ...preferences, view };
+  render();
+  persist();
+}
+
+$('#view-original').addEventListener('click', () => changeView('original'));
+$('#view-text').addEventListener('click', () => changeView('text'));
+
 $('#jump-form').addEventListener('submit', event => {
   event.preventDefault();
   goTo(Number($('#jump-page').value));
@@ -142,6 +168,7 @@ $('#pdf-input').addEventListener('change', async event => {
     });
     book = imported;
     state = restart(state);
+    preferences = { ...preferences, view: 'original' };
     render(true);
     message('Book opened. Use Reader settings to tell us which PDF page is printed page 1.');
     persist();
@@ -196,7 +223,7 @@ $('#settings-form').addEventListener('submit', async event => {
     }
     if (firstPage !== book.firstPage) state = restart(state);
     book = { ...book, firstPage, coverPage, cover };
-    preferences = { opacity: Number($('#cover-opacity').value), textSize: Number($('#text-size').value) };
+    preferences = { ...preferences, opacity: Number($('#cover-opacity').value), textSize: Number($('#text-size').value) };
     $('#settings-dialog').close();
     message('Reader settings saved.');
     render(true);
@@ -218,7 +245,7 @@ try {
   if (saved?.book?.pages?.length) {
     book = saved.book;
     state = saved.state;
-    preferences = saved.preferences;
+    preferences = { ...defaultPreferences, ...saved.preferences };
     getPageText(book, state.page);
     savedBook = book;
     render();
@@ -227,7 +254,7 @@ try {
 } catch {
   book = createDemo();
   state = { page: 1, history: [] };
-  preferences = { opacity: 18, textSize: 21 };
+  preferences = { ...defaultPreferences };
   render();
   message('Local saving is unavailable. You can still open a PDF and read during this visit.');
 } finally {
