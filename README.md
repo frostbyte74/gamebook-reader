@@ -17,7 +17,7 @@ Open the local address printed by Vite. Use `npm run build` to generate the stat
 
 1. Select **Open a PDF**. Each page opens in its **Original page** layout, preserving the book's text, illustrations, and page design.
 2. In **Reader settings**, identify the PDF page that contains printed page 1. For a cover, two introduction pages, then story page 1, enter `4`.
-3. The first PDF page is used as a faded, full-screen background. Change **Use this PDF page as the cover** if necessary, and adjust its intensity. Zero hides it.
+3. The first PDF page appears as a cover thumbnail at the top right and as a faded, full-screen background. Change **Use this PDF page as the cover** to update both. Adjust the background intensity separately; zero hides the background without hiding the thumbnail.
 4. Follow generated **Turn to page** buttons, use **Continue** to advance sequentially, or enter any printed page number in **Go to page**.
 5. **Restart book** returns to printed page 1 and clears the reading trail, without deleting the book or settings.
 6. Switch to **Text view** for reflowed text and adjustable reading size. Switch back to **Original page** to see all artwork. The selected view is saved; opening a new PDF starts in Original page view.

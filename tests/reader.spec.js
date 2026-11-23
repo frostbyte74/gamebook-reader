@@ -54,6 +54,7 @@ test('PDF import extracts real text, maps printed numbers, renders cover and sav
   page.on('request', request => {
     if (!request.url().startsWith('http://127.0.0.1:4179/') && !/^(data:|blob:)/.test(request.url())) externalRequests.push(request.url());
   });
+  await expect(page.locator('#cover-thumbnail')).toBeHidden();
   await page.locator('#pdf-input').setInputFiles({ name: 'My Adventure.pdf', mimeType: 'application/pdf', buffer: makePdf() });
   await expect(page.getByRole('dialog', { name: 'Make yourself comfortable' })).toBeVisible();
   await page.getByLabel('Printed page 1 starts at PDF page').fill('3');
@@ -61,6 +62,13 @@ test('PDF import extracts real text, maps printed numbers, renders cover and sav
   await expect(page.locator('#page-text')).toContainText('You arrive at the gate.');
   await expect(page.locator('#page-counter')).toHaveText('PAGE 1 OF 3');
   await expect(page.locator('#cover-background')).toHaveCSS('background-image', /data:image\/jpeg;base64,/);
+  const thumbnail = page.getByRole('img', { name: 'Cover of My Adventure' });
+  await expect(thumbnail).toBeVisible();
+  await expect.poll(() => thumbnail.evaluate(image => image.naturalWidth)).toBeGreaterThan(0);
+  const firstThumbnail = await thumbnail.getAttribute('src');
+  const headerRight = await page.locator('.masthead').evaluate(element => element.getBoundingClientRect().right);
+  const thumbnailRight = await thumbnail.evaluate(element => element.getBoundingClientRect().right);
+  expect(thumbnailRight).toBeCloseTo(headerRight, 0);
   const firstCover = await page.locator('#cover-background').evaluate(element => element.style.backgroundImage);
   await page.getByRole('button', { name: 'Turn to page 3' }).click();
   await expect(page.locator('#page-text')).toContainText('You found the ending.');
@@ -73,10 +81,14 @@ test('PDF import extracts real text, maps printed numbers, renders cover and sav
   await expect(page.getByRole('dialog')).not.toBeVisible();
   await expect(page.locator('#cover-background')).toHaveCSS('opacity', '0.3');
   await expect(page.locator('#cover-background')).not.toHaveCSS('background-image', firstCover);
+  await expect(thumbnail).not.toHaveAttribute('src', firstThumbnail);
+  await expect(thumbnail).toHaveCSS('opacity', '1');
+  const updatedThumbnail = await thumbnail.getAttribute('src');
   await page.reload();
   await expect(page.locator('#page-text')).toContainText('You found the ending.');
   await expect(page.locator('#book-title')).toHaveText('My Adventure');
   await expect(page.locator('#cover-background')).toHaveCSS('opacity', '0.3');
+  await expect(thumbnail).toHaveAttribute('src', updatedThumbnail);
   await page.getByRole('button', { name: 'Reader settings' }).click();
   await expect(page.getByLabel('Printed page 1 starts at PDF page')).toHaveValue('3');
   await expect(page.getByLabel('Use this PDF page as the cover')).toHaveValue('2');
@@ -148,6 +160,8 @@ test('original pages preserve embedded images at the correct offset and survive 
   await expectIllustration(page, 3, [221, 34, 34]);
   await page.getByRole('button', { name: 'Try the demo' }).click();
   await expect(page.locator('#page-display')).toBeHidden();
+  await expect(page.locator('#cover-thumbnail')).toBeHidden();
+  await expect(page.locator('#cover-thumbnail')).not.toHaveAttribute('src');
   await expect(page.locator('#original-page-view')).toBeHidden();
   await expect(page.locator('#page-text')).toBeVisible();
   expect(errors).toEqual([]);

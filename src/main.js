@@ -94,6 +94,15 @@ function render(focus = false) {
   $('#jump-page').value = '';
   $('#journey-note').textContent = state.history.length ? `${state.history.length} page turn${state.history.length === 1 ? '' : 's'} along your path.` : 'One page. A world of possibilities.';
   $('#cover-background').style.backgroundImage = book.cover ? `url("${book.cover}")` : '';
+  const thumbnail = $('#cover-thumbnail');
+  thumbnail.hidden = !book.cover;
+  if (book.cover) {
+    if (thumbnail.getAttribute('src') !== book.cover) thumbnail.src = book.cover;
+    thumbnail.alt = `Cover of ${book.title}`;
+  } else {
+    thumbnail.removeAttribute('src');
+    thumbnail.alt = '';
+  }
   document.documentElement.style.setProperty('--cover-opacity', preferences.opacity / 100);
   document.documentElement.style.setProperty('--story-size', `${preferences.textSize}px`);
   if (focus) {
